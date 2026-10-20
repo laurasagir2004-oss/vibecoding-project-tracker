@@ -131,6 +131,36 @@ function DueBadge({ task, due }) {
   );
 }
 
+
+// ---------- M9 context: curated briefing for the next AI / teammate ----------
+const CONTEXT_TOOLS = ['Claude', 'ChatGPT', 'Cursor', 'Lovable', 'Replit', 'Other'];
+
+// Pre-filled into every new task so the briefing has a shape.
+const CONTEXT_TEMPLATE = `## Background
+What is this task and why does it matter?
+
+## Constraints
+Tech stack, design rules, things that must not change.
+
+## Tried so far
+Prompts used, what worked, what didn't.
+
+## Pick up
+The very next step for whoever (or whichever AI) continues.`;
+
+// ISO timestamp -> "just now" / "5 min ago" / "2 h ago" / "3 days ago"
+function timeAgo(iso) {
+  if (!iso) return null;
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+
 function avatarStyle(name) {
   const i = TEAM.indexOf(name);
   return AVATAR_STYLE[i >= 0 ? i % AVATAR_STYLE.length : 0];
@@ -201,6 +231,9 @@ function blankTask() {
     status: 'todo',
     assignee: TEAM[0],
     dueDate: null,
+    context: CONTEXT_TEMPLATE,
+    contextTool: null,
+    contextUpdatedAt: null,
     createdDate: isoDaysFromNow(0),
   };
 }
@@ -483,7 +516,7 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
         aria-modal="true"
         aria-labelledby="modal-title"
         onSubmit={handleSubmit}
-        className="w-full max-w-lg rounded-lg bg-surface-card p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-surface-card p-6 shadow-xl"
       >
         <div className="mb-4 flex items-start justify-between">
           <h2 id="modal-title" className="flex items-center gap-2 text-lg font-semibold text-text-primary">
@@ -587,7 +620,61 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
             </div>
           </div>
 
-          {/* TODO M9 context: Context textarea + AI tool dropdown go here. */}
+                    {/* M9 context: curated briefing, saved with the task. */}
+          <div className="rounded-md border border-text-muted/20 bg-surface-page p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <label htmlFor="f-context" className={label}>
+                Context (Markdown)
+              </label>
+              <span className="text-[11px] text-text-muted" aria-live="polite">
+                {draft.contextUpdatedAt
+                  ? `Last updated ${timeAgo(draft.contextUpdatedAt)}`
+                  : 'Not updated yet'}
+              </span>
+            </div>
+            <p id="f-context-help" className="mt-1 text-xs text-text-muted">
+              A paste-ready briefing for your AI or a teammate.
+            </p>
+            <textarea
+              id="f-context"
+              rows={8}
+              aria-describedby="f-context-help"
+              className={`${field} font-mono text-xs leading-relaxed`}
+              value={draft.context ?? ''}
+              placeholder={CONTEXT_TEMPLATE}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  context: e.target.value,
+                  contextUpdatedAt: new Date().toISOString(),
+                }))
+              }
+            />
+            <div className="mt-3">
+              <label htmlFor="f-tool" className={label}>
+                AI tool (optional)
+              </label>
+              <select
+                id="f-tool"
+                className={field}
+                value={draft.contextTool ?? ''}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    contextTool: e.target.value || null,
+                    contextUpdatedAt: new Date().toISOString(),
+                  }))
+                }
+              >
+                <option value="">Not set</option>
+                {CONTEXT_TOOLS.map((tool) => (
+                  <option key={tool} value={tool}>
+                    {tool}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Footer: delete on the left, cancel/save on the right. */}
