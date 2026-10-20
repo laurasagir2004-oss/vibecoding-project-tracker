@@ -170,18 +170,74 @@ const label = 'block text-xs font-semibold uppercase tracking-wider text-text-mu
 
 // ---------- components ----------
 
+// ---------- M6 tag-style: feature vs. bug ----------
+// Colour + icon + text label, so type is never shown by colour alone.
+const TYPE_STYLE = {
+  feature: {
+    label: 'Feature',
+    stripe: 'border-l-type-feature',
+    badge: 'bg-type-feature/10 text-type-feature',
+    icon: (
+      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+    ),
+  },
+  bug: {
+    label: 'Bug',
+    stripe: 'border-l-type-bug',
+    badge: 'bg-type-bug/10 text-type-bug',
+    icon: (
+      <>
+        <rect x="8" y="6" width="8" height="14" rx="4" />
+        <path d="M12 10v6M4 10h4M16 10h4M4 16h4M16 16h4M9 6l-2-3M15 6l2-3" />
+      </>
+    ),
+  },
+};
+
+function TypeBadge({ type }) {
+  const style = TYPE_STYLE[type] ?? TYPE_STYLE.feature;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium ${style.badge}`}
+    >
+      <svg
+        aria-hidden="true"
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {style.icon}
+      </svg>
+      {style.label}
+    </span>
+  );
+}
+
 function TaskCard({ task, onOpen }) {
+  const style = TYPE_STYLE[task.type] ?? TYPE_STYLE.feature;
   return (
     <li>
       <button
         type="button"
         onClick={() => onOpen(task)}
-        className="w-full rounded-md border border-text-muted/20 bg-surface-card p-3 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
-        aria-label={`Edit task: ${task.title}`}
+        className={`w-full rounded-md border border-l-4 border-text-muted/20 ${style.stripe} bg-surface-card p-3 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary`}
+        aria-label={`Edit ${style.label.toLowerCase()}: ${task.title}`}
       >
-        <p className="text-sm font-medium text-text-primary">{task.title}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium text-text-primary">
+            {task.title}
+          </p>
+          <TypeBadge type={task.type} />
+        </div>
         {task.description && (
-          <p className="mt-1 line-clamp-2 text-xs text-text-muted">{task.description}</p>
+          <p className="mt-1 line-clamp-2 text-xs text-text-muted">
+            {task.description}
+          </p>
         )}
 
         <div className="mt-3 flex items-center justify-between gap-2">
@@ -276,8 +332,8 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
         className="w-full max-w-lg rounded-lg bg-surface-card p-6 shadow-xl"
       >
         <div className="mb-4 flex items-start justify-between">
-          <h2 id="modal-title" className="text-lg font-semibold text-text-primary">
-            {isNew ? 'New task' : 'Edit task'}
+          <h2 id="modal-title" className="flex items-center gap-2 text-lg font-semibold text-text-primary">
+            {isNew ? 'New task' : 'Edit task'} <TypeBadge type={draft.type} />
           </h2>
           <button type="button" onClick={onClose} className="rounded p-1 text-text-muted hover:bg-text-muted/10" aria-label="Close">
             ✕
