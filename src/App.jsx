@@ -48,6 +48,89 @@ const AVATAR_STYLE = [
   'bg-type-feature/10 text-type-feature',
   'bg-due-warning/10 text-due-warning',
 ];
+
+// ---------- M8 due-tint: deadline states ----------
+// Works out the state from the due date. No new fields, no user action.
+// Colour + icon + text label, so the state is never shown by colour alone.
+const DUE_ICONS = {
+  safe: <path d="M8 2v4M16 2v4M3 10h18M5 4h14v18H5zM9 16l2 2 4-4" />,
+  warning: <path d="M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z" />,
+  overdue: <path d="M12 3l10 18H2zM12 10v4M12 17h.01" />,
+  neutral: <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12l3 3 5-6" />,
+};
+
+function dueInfo(task) {
+  // Done always looks neutral, even if it was overdue.
+  if (task.status === 'done') {
+    return {
+      state: 'neutral',
+      label: 'Done',
+      border: 'border-text-muted/20',
+      badge: 'bg-due-neutral/10 text-due-neutral',
+    };
+  }
+  if (!task.dueDate) {
+    return { state: 'none', label: '', border: 'border-text-muted/20' };
+  }
+  // Whole days between today and the due date (local time).
+  const [y, m, d] = task.dueDate.split('-').map(Number);
+  const due = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((due - today) / 86400000);
+
+  if (days < 0) {
+    return {
+      state: 'overdue',
+      label: 'Overdue',
+      border: 'border-due-overdue/60',
+      badge: 'bg-due-overdue/10 text-due-overdue',
+    };
+  }
+  if (days <= 1) {
+    return {
+      state: 'warning',
+      label: days === 0 ? 'Due today' : 'Due tomorrow',
+      border: 'border-due-warning/60',
+      badge: 'bg-due-warning/10 text-due-warning',
+    };
+  }
+  return {
+    state: 'safe',
+    label: formatDate(task.dueDate),
+    border: 'border-due-safe/40',
+    badge: 'bg-due-safe/10 text-due-safe',
+  };
+}
+
+function DueBadge({ task, due }) {
+  if (due.state === 'none') return null;
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium ${due.badge}`}
+      title={task.dueDate ? `Due ${formatDate(task.dueDate)}` : undefined}
+    >
+      <svg
+        aria-hidden="true"
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {DUE_ICONS[due.state]}
+      </svg>
+      {due.label}
+      {task.dueDate && due.state !== 'safe' && (
+        <span className="sr-only">, due {formatDate(task.dueDate)}</span>
+      )}
+    </span>
+  );
+}
+
 function avatarStyle(name) {
   const i = TEAM.indexOf(name);
   return AVATAR_STYLE[i >= 0 ? i % AVATAR_STYLE.length : 0];
@@ -243,9 +326,10 @@ function Avatar({ name, size = 'h-7 w-7' }) {
 function TaskCard({ task, onOpen, onHandoff, highlighted }) {
   const style = TYPE_STYLE[task.type] ?? TYPE_STYLE.feature;
   const handoffId = `handoff-${task.id}`;
+  const due = dueInfo(task);
   return (
     <li
-      className={`rounded-md border border-l-4 border-text-muted/20 ${style.stripe} bg-surface-card transition-shadow hover:shadow-md ${
+      className={`rounded-md border border-l-4 ${due.border} ${style.stripe} bg-surface-card transition-shadow hover:shadow-md ${
         highlighted ? 'ring-2 ring-brand-accent' : ''
       }`}
     >
@@ -289,12 +373,7 @@ function TaskCard({ task, onOpen, onHandoff, highlighted }) {
           </select>
         </div>
 
-        {task.dueDate && (
-          <span className="shrink-0 font-mono text-xs text-text-muted">
-            <span className="sr-only">Due </span>
-            {formatDate(task.dueDate)}
-          </span>
-        )}
+                <DueBadge task={task} due={due} />
       </div>
     </li>
   );
