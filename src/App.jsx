@@ -161,6 +161,70 @@ function timeAgo(iso) {
 }
 
 
+
+// ---------- M10 copy-context: task -> paste-ready Markdown briefing ----------
+function taskToMarkdown(task) {
+  const stage = STAGES.find((s) => s.id === task.status);
+  const meta = [
+    `**Type:** ${task.type === 'bug' ? 'Bug' : 'Feature'}`,
+    `**Status:** ${stage ? stage.label : task.status}`,
+    `**Owner:** ${task.assignee}`,
+    task.dueDate ? `**Due:** ${formatDate(task.dueDate)}` : null,
+    task.contextTool ? `**Last AI tool:** ${task.contextTool}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return [
+    `# Task: ${task.title}`,
+    '',
+    meta,
+    '',
+    '## Description',
+    task.description || '_No description yet._',
+    '',
+    '## Context',
+    task.context && task.context.trim() ? task.context.trim() : '_No context yet._',
+    '',
+    '---',
+    'You are helping me continue this task. Read the context above, then help me with the "Pick up" step.',
+  ].join('\n');
+}
+
+// Copy text to the clipboard, with a fallback for older browsers.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = document.createElement('textarea');
+    area.value = text;
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  }
+}
+
+const COPY_ICON = (
+  <svg
+    aria-hidden="true"
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+  </svg>
+);
+
+
 function avatarStyle(name) {
   const i = TEAM.indexOf(name);
   return AVATAR_STYLE[i >= 0 ? i % AVATAR_STYLE.length : 0];
@@ -356,7 +420,7 @@ function Avatar({ name, size = 'h-7 w-7' }) {
   );
 }
 
-function TaskCard({ task, onOpen, onHandoff, highlighted }) {
+function TaskCard({ task, onOpen, onHandoff, highlighted, onCopy }) {
   const style = TYPE_STYLE[task.type] ?? TYPE_STYLE.feature;
   const handoffId = `handoff-${task.id}`;
   const due = dueInfo(task);
@@ -408,7 +472,18 @@ function TaskCard({ task, onOpen, onHandoff, highlighted }) {
 
                 <DueBadge task={task} due={due} />
       </div>
-    </li>
+    
+	      {/* M10 copy-context: one-click briefing for the AI. */}
+      <button
+        type="button"
+        onClick={() => onCopy(task)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-b-md border-t border-text-muted/15 py-1.5 text-xs font-medium text-brand-primary hover:bg-brand-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+        aria-label={`Copy context for ${task.title}`}
+      >
+        {COPY_ICON}
+        Copy Context
+      </button>
+</li>
   );
 }
 
@@ -450,7 +525,7 @@ function Toast({ message }) {
   );
 }
 
-function Column({ stage, tasks, onOpen, onHandoff, highlightId }) {
+function Column({ stage, tasks, onOpen, onHandoff, highlightId, onCopy }) {
   const headingId = `col-${stage.id}`;
   return (
     <section
@@ -474,7 +549,7 @@ function Column({ stage, tasks, onOpen, onHandoff, highlightId }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onOpen={onOpen} onHandoff={onHandoff} highlighted={task.id === highlightId} />
+            <TaskCard key={task.id} task={task} onOpen={onOpen} onHandoff={onHandoff} highlighted={task.id === highlightId} onCopy={onCopy} />
           ))}
         </ul>
       )}
@@ -483,7 +558,7 @@ function Column({ stage, tasks, onOpen, onHandoff, highlightId }) {
 }
 
 // M5 crud-modal: one modal for both create and edit.
-function TaskModal({ task, onSave, onDelete, onClose }) {
+function TaskModal({ task, onSave, onDelete, onClose, onCopy }) {
   const [draft, setDraft] = useState(task);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const titleRef = useRef(null);
@@ -713,6 +788,7 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
           </div>
           {!confirmingDelete && (
             <div className="flex gap-2">
+              <button type="button" className={btnGhost} onClick={() => onCopy(draft)}>Copy Context</button>
               <button type="button" className={btnGhost} onClick={onClose}>
                 Cancel
               </button>
@@ -765,7 +841,19 @@ export default function App() {
     }, 2500);
   };
 
-  const deleteTask = (id) => {
+    // M10 copy-context: copy the briefing and confirm with a toast.
+  const copyContext = async (task) => {
+    const ok = await copyText(taskToMarkdown(task));
+    setToast(
+      ok
+        ? 'Context copied. Paste it into your AI to pick up where you left off.'
+        : "Couldn't copy. Try again.",
+    );
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 2500);
+  };
+
+const deleteTask = (id) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setEditing(null);
   };
@@ -819,7 +907,7 @@ export default function App() {
             key={stage.id}
             stage={stage}
             tasks={tasks.filter((t) => t.status === stage.id)}
-            onOpen={setEditing} onHandoff={handoffTask} highlightId={highlightId}
+            onOpen={setEditing} onHandoff={handoffTask} onCopy={copyContext} highlightId={highlightId}
           />
         ))}
       </main>
@@ -831,6 +919,7 @@ export default function App() {
           task={editing}
           onSave={saveTask}
           onDelete={deleteTask}
+          onCopy={copyContext}
           onClose={() => setEditing(null)}
         />
       )}
