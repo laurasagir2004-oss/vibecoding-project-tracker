@@ -38,9 +38,20 @@ export const STAGES = [
   { id: 'done',        label: 'Done' },
 ];
 
-// PRD §8 — solo project, so one assignee.
-export const TEAM = ['Amira Koki'];
+// PRD §8 — Amira plus two placeholder teammates (swap in real names later).
+// These are the only valid values for `Task.assignee`.
+export const TEAM = ['Amira Koki', 'Jordan Lee', 'Priya Shah'];
 
+// M7 task-owner: one avatar colour per teammate, so owners are easy to spot.
+const AVATAR_STYLE = [
+  'bg-brand-primary/10 text-brand-primary',
+  'bg-type-feature/10 text-type-feature',
+  'bg-due-warning/10 text-due-warning',
+];
+function avatarStyle(name) {
+  const i = TEAM.indexOf(name);
+  return AVATAR_STYLE[i >= 0 ? i % AVATAR_STYLE.length : 0];
+}
 /**
  * A tiny localStorage hook — survives reloads, no library needed.
  */
@@ -218,20 +229,35 @@ function TypeBadge({ type }) {
   );
 }
 
-function TaskCard({ task, onOpen }) {
-  const style = TYPE_STYLE[task.type] ?? TYPE_STYLE.feature;
+function Avatar({ name, size = 'h-7 w-7' }) {
   return (
-    <li>
+    <span
+      className={`flex ${size} shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${avatarStyle(name)}`}
+      aria-hidden="true"
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
+function TaskCard({ task, onOpen, onHandoff, highlighted }) {
+  const style = TYPE_STYLE[task.type] ?? TYPE_STYLE.feature;
+  const handoffId = `handoff-${task.id}`;
+  return (
+    <li
+      className={`rounded-md border border-l-4 border-text-muted/20 ${style.stripe} bg-surface-card transition-shadow hover:shadow-md ${
+        highlighted ? 'ring-2 ring-brand-accent' : ''
+      }`}
+    >
+      {/* Main area opens the edit modal. */}
       <button
         type="button"
         onClick={() => onOpen(task)}
-        className={`w-full rounded-md border border-l-4 border-text-muted/20 ${style.stripe} bg-surface-card p-3 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary`}
+        className="w-full rounded-t-md p-3 pb-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
         aria-label={`Edit ${style.label.toLowerCase()}: ${task.title}`}
       >
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium text-text-primary">
-            {task.title}
-          </p>
+          <p className="text-sm font-medium text-text-primary">{task.title}</p>
           <TypeBadge type={task.type} />
         </div>
         {task.description && (
@@ -239,31 +265,80 @@ function TaskCard({ task, onOpen }) {
             {task.description}
           </p>
         )}
-
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 text-xs text-text-muted">
-            <span
-              className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-primary/10 text-[10px] font-semibold text-brand-primary"
-              aria-hidden="true"
-            >
-              {initials(task.assignee)}
-            </span>
-            <span>{task.assignee}</span>
-          </span>
-
-          {task.dueDate && (
-            <span className="font-mono text-xs text-text-muted">
-              <span className="sr-only">Due </span>
-              {formatDate(task.dueDate)}
-            </span>
-          )}
-        </div>
       </button>
+
+      {/* Owner row: avatar + "Hand off to..." + due date. */}
+      <div className="flex items-center justify-between gap-2 px-3 pb-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Avatar name={task.assignee} />
+          <label htmlFor={handoffId} className="sr-only">
+            Hand off {task.title} to
+          </label>
+          <select
+            id={handoffId}
+            value={task.assignee}
+            onChange={(e) => onHandoff(task.id, e.target.value)}
+            title="Hand off to…"
+            className="min-w-0 cursor-pointer truncate rounded border border-transparent bg-transparent py-0.5 pr-6 text-xs text-text-primary hover:border-text-muted/30 focus:border-brand-primary focus:outline-none"
+          >
+            {TEAM.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {task.dueDate && (
+          <span className="shrink-0 font-mono text-xs text-text-muted">
+            <span className="sr-only">Due </span>
+            {formatDate(task.dueDate)}
+          </span>
+        )}
+      </div>
     </li>
   );
 }
 
-function Column({ stage, tasks, onOpen }) {
+// M7 task-owner: strip showing what each teammate is currently driving.
+function DriverStrip({ tasks }) {
+  return (
+    <ul className="mb-4 flex flex-wrap gap-2" aria-label="Who is driving what">
+      {TEAM.map((name) => {
+        const active = tasks.filter(
+          (t) => t.assignee === name && t.status !== 'done',
+        ).length;
+        return (
+          <li
+            key={name}
+            className="flex items-center gap-2 rounded-full border border-text-muted/20 bg-surface-card py-1 pl-1 pr-3 text-xs text-text-primary"
+          >
+            <Avatar name={name} size="h-6 w-6" />
+            <span>{name}</span>
+            <span className="font-mono text-text-muted">{active} active</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// Small notification that fades in and out (200 ms, per DESIGN.md §7).
+function Toast({ message }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-text-primary px-4 py-2 text-sm text-surface-card shadow-lg transition-opacity duration-200 ${
+        message ? 'opacity-100' : 'pointer-events-none opacity-0'
+      }`}
+    >
+      {message}
+    </div>
+  );
+}
+
+function Column({ stage, tasks, onOpen, onHandoff, highlightId }) {
   const headingId = `col-${stage.id}`;
   return (
     <section
@@ -287,7 +362,7 @@ function Column({ stage, tasks, onOpen }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onOpen={onOpen} />
+            <TaskCard key={task.id} task={task} onOpen={onOpen} onHandoff={onHandoff} highlighted={task.id === highlightId} />
           ))}
         </ul>
       )}
@@ -506,6 +581,24 @@ export default function App() {
     setEditing(null);
   };
 
+  // M7 task-owner: reassign a task and acknowledge it visually.
+  const [toast, setToast] = useState('');
+  const [highlightId, setHighlightId] = useState(null);
+  const toastTimer = useRef(null);
+
+  const handoffTask = (id, name) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, assignee: name } : t)),
+    );
+    setToast(`Handed off to ${name}.`);
+    setHighlightId(id);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => {
+      setToast('');
+      setHighlightId(null);
+    }, 2500);
+  };
+
   const deleteTask = (id) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setEditing(null);
@@ -553,17 +646,19 @@ export default function App() {
       {/* TODO M11 anchors: render the Anchor Board above the board. */}
 
       {/* M4 data-model: the four-column Kanban board. */}
+      <DriverStrip tasks={tasks} />
       <main className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {STAGES.map((stage) => (
           <Column
             key={stage.id}
             stage={stage}
             tasks={tasks.filter((t) => t.status === stage.id)}
-            onOpen={setEditing}
+            onOpen={setEditing} onHandoff={handoffTask} highlightId={highlightId}
           />
         ))}
       </main>
 
+      <Toast message={toast} />
       {editing && (
         <TaskModal
           key={editing.id ?? 'new'}
