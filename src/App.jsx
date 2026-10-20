@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Amira's Kanban — Vibecoding Project Tracker.
  *
  * Build sequence in Phase 3:
  *   - M4  data-model    : four columns + task cards            ✅
- *   - M5  crud-modal    : "+" button modal and edit-on-click modal.
+ *   - M5  crud-modal    : "+" button modal and edit-on-click modal ✅
  *   - M6  tag-style     : feature vs. bug color coding (DESIGN.md §2).
  *   - M7  task-owner    : assignee badge + "Hand off to..." dropdown.
  *   - M8  due-tint      : color cards by due date (DESIGN.md §2).
@@ -92,6 +92,25 @@ function formatDate(iso) {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+// Unique-enough id for a hackathon (timestamp + random suffix).
+function newId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+// A blank task for the "+ New task" modal.
+function blankTask() {
+  return {
+    id: null, // null = not saved yet (create mode)
+    title: '',
+    description: '',
+    type: 'feature',
+    status: 'todo',
+    assignee: TEAM[0],
+    dueDate: null,
+    createdDate: isoDaysFromNow(0),
+  };
+}
+
 // ---------- seed data (M4) ----------
 // Mock tasks so the board isn't empty on first load. Due dates are relative
 // to today so they always demo well (and M8 due-tint has something to show).
@@ -138,39 +157,57 @@ const SEED_TASKS = [
   },
 ];
 
+// ---------- shared styles ----------
+const btnPrimary =
+  'rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-surface-card hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+const btnGhost =
+  'rounded-md border border-text-muted/30 px-4 py-2 text-sm font-medium text-text-primary hover:bg-text-muted/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent';
+const btnDanger =
+  'rounded-md px-3 py-2 text-sm font-medium text-due-overdue hover:bg-due-overdue/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-due-overdue';
+const field =
+  'mt-1 w-full rounded-md border border-text-muted/30 bg-surface-card px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/30';
+const label = 'block text-xs font-semibold uppercase tracking-wider text-text-muted';
+
 // ---------- components ----------
 
-function TaskCard({ task }) {
+function TaskCard({ task, onOpen }) {
   return (
-    <li className="rounded-md border border-text-muted/20 bg-surface-card p-3 transition-shadow hover:shadow-md">
-      <p className="text-sm font-medium text-text-primary">{task.title}</p>
-      {task.description && (
-        <p className="mt-1 line-clamp-2 text-xs text-text-muted">{task.description}</p>
-      )}
-
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-xs text-text-muted">
-          <span
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-primary/10 text-[10px] font-semibold text-brand-primary"
-            aria-hidden="true"
-          >
-            {initials(task.assignee)}
-          </span>
-          <span>{task.assignee}</span>
-        </span>
-
-        {task.dueDate && (
-          <span className="font-mono text-xs text-text-muted">
-            <span className="sr-only">Due </span>
-            {formatDate(task.dueDate)}
-          </span>
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        className="w-full rounded-md border border-text-muted/20 bg-surface-card p-3 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+        aria-label={`Edit task: ${task.title}`}
+      >
+        <p className="text-sm font-medium text-text-primary">{task.title}</p>
+        {task.description && (
+          <p className="mt-1 line-clamp-2 text-xs text-text-muted">{task.description}</p>
         )}
-      </div>
+
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 text-xs text-text-muted">
+            <span
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-primary/10 text-[10px] font-semibold text-brand-primary"
+              aria-hidden="true"
+            >
+              {initials(task.assignee)}
+            </span>
+            <span>{task.assignee}</span>
+          </span>
+
+          {task.dueDate && (
+            <span className="font-mono text-xs text-text-muted">
+              <span className="sr-only">Due </span>
+              {formatDate(task.dueDate)}
+            </span>
+          )}
+        </div>
+      </button>
     </li>
   );
 }
 
-function Column({ stage, tasks }) {
+function Column({ stage, tasks, onOpen }) {
   const headingId = `col-${stage.id}`;
   return (
     <section
@@ -194,7 +231,7 @@ function Column({ stage, tasks }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard key={task.id} task={task} onOpen={onOpen} />
           ))}
         </ul>
       )}
@@ -202,13 +239,222 @@ function Column({ stage, tasks }) {
   );
 }
 
+// M5 crud-modal: one modal for both create and edit.
+function TaskModal({ task, onSave, onDelete, onClose }) {
+  const [draft, setDraft] = useState(task);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const titleRef = useRef(null);
+  const isNew = task.id === null;
+
+  // Focus the title on open; close on Escape.
+  useEffect(() => {
+    titleRef.current?.focus();
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const update = (key) => (e) =>
+    setDraft((d) => ({ ...d, [key]: e.target.value === '' && key === 'dueDate' ? null : e.target.value }));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!draft.title.trim()) return;
+    onSave({ ...draft, title: draft.title.trim(), description: draft.description.trim() });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        onSubmit={handleSubmit}
+        className="w-full max-w-lg rounded-lg bg-surface-card p-6 shadow-xl"
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <h2 id="modal-title" className="text-lg font-semibold text-text-primary">
+            {isNew ? 'New task' : 'Edit task'}
+          </h2>
+          <button type="button" onClick={onClose} className="rounded p-1 text-text-muted hover:bg-text-muted/10" aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+               <div className="space-y-4">
+          <div>
+            <label htmlFor="f-title" className={label}>
+              Title *
+            </label>
+            <input
+              id="f-title"
+              ref={titleRef}
+              required
+              className={field}
+              value={draft.title}
+              onChange={update('title')}
+              placeholder="e.g. Build the login page"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="f-desc" className={label}>
+              Description
+            </label>
+            <textarea
+              id="f-desc"
+              rows={3}
+              className={field}
+              value={draft.description}
+              onChange={update('description')}
+              placeholder="What needs doing, in a sentence or two."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="f-type" className={label}>
+                Type
+              </label>
+              <select
+                id="f-type"
+                className={field}
+                value={draft.type}
+                onChange={update('type')}
+              >
+                <option value="feature">Feature</option>
+                <option value="bug">Bug</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="f-status" className={label}>
+                Status
+              </label>
+              <select
+                id="f-status"
+                className={field}
+                value={draft.status}
+                onChange={update('status')}
+              >
+                {STAGES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="f-assignee" className={label}>
+                Assignee
+              </label>
+              <select
+                id="f-assignee"
+                className={field}
+                value={draft.assignee}
+                onChange={update('assignee')}
+              >
+                {TEAM.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="f-due" className={label}>
+                Due date
+              </label>
+              <input
+                id="f-due"
+                type="date"
+                className={field}
+                value={draft.dueDate ?? ''}
+                onChange={update('dueDate')}
+              />
+            </div>
+          </div>
+
+          {/* TODO M9 context: Context textarea + AI tool dropdown go here. */}
+        </div>
+
+        {/* Footer: delete on the left, cancel/save on the right. */}
+        <div className="mt-6 flex items-center justify-between gap-2">
+          <div>
+            {!isNew && !confirmingDelete && (
+              <button
+                type="button"
+                className={btnDanger}
+                onClick={() => setConfirmingDelete(true)}
+              >
+                Delete
+              </button>
+            )}
+            {!isNew && confirmingDelete && (
+              <div className="flex items-center gap-2" role="alert">
+                <span className="text-xs text-text-primary">
+                  Delete "{task.title}"? This can't be undone.
+                </span>
+                <button
+                  type="button"
+                  className={btnDanger}
+                  onClick={() => onDelete(task.id)}
+                >
+                  Yes, delete
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-text-muted underline"
+                  onClick={() => setConfirmingDelete(false)}
+                >
+                  Keep
+                </button>
+              </div>
+            )}
+          </div>
+          {!confirmingDelete && (
+            <div className="flex gap-2">
+              <button type="button" className={btnGhost} onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={btnPrimary}
+                disabled={!draft.title.trim()}
+              >
+                {isNew ? 'Add task' : 'Save changes'}
+              </button>
+            </div>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function App() {
   // M4 data-model: tasks persisted to localStorage, seeded on first load.
   const [tasks, setTasks] = useLocalStorage('vibetracker.tasks', SEED_TASKS);
 
-  // TODO M5 crud-modal:
-  //   const [editing, setEditing] = useState(null);
-  //
+  // M5 crud-modal: the task being edited (null = modal closed).
+  const [editing, setEditing] = useState(null);
+
+  const saveTask = (task) => {
+    if (task.id === null) {
+      setTasks((prev) => [...prev, { ...task, id: newId() }]);
+    } else {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    }
+    setEditing(null);
+  };
+
+  const deleteTask = (id) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setEditing(null);
+  };
+
   // TODO M11 anchors:
   //   const [anchors, setAnchors] = useLocalStorage('vibetracker.anchors', [...]);
 
@@ -217,18 +463,38 @@ export default function App() {
       <header className="mb-6 flex items-end justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold text-brand-primary">
-            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" />
+            <svg
+              aria-hidden="true"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
             </svg>
             Amira's Kanban
           </h1>
-          <p className="text-sm text-text-muted">Where every prompt finds its way home.</p>
+          <p className="text-sm text-text-muted">
+            Where every prompt finds its way home.
+          </p>
         </div>
-        {/* TODO M5 crud-modal: "+ New task" button goes here. */}
+        <button
+          type="button"
+          className={btnPrimary}
+          onClick={() => setEditing(blankTask())}
+        >
+          + New task
+        </button>
       </header>
 
-      {/* TODO M11 anchors: render the Anchor Board (Presentation / Demo / Report / Documentation) above the board. */}
+      {/* TODO M11 anchors: render the Anchor Board above the board. */}
 
       {/* M4 data-model: the four-column Kanban board. */}
       <main className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -237,9 +503,20 @@ export default function App() {
             key={stage.id}
             stage={stage}
             tasks={tasks.filter((t) => t.status === stage.id)}
+            onOpen={setEditing}
           />
         ))}
       </main>
+
+      {editing && (
+        <TaskModal
+          key={editing.id ?? 'new'}
+          task={editing}
+          onSave={saveTask}
+          onDelete={deleteTask}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }
