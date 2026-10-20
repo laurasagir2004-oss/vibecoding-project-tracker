@@ -1,6 +1,6 @@
 # Vibecoding Project Tracker — Design
 
-**Status:** Completed by Amira Koki (solo project) · Koki's Kanban
+**Status:** Completed by Amira Koki (solo project) · Amira's Kanban
 
 **Why this file exists.** This tracker is your tool. It should look like *your* tool — not a generic Kanban with default Tailwind blue. Twenty minutes of design decisions here will be visible on every screen for the next six weeks of Module 5.
 
@@ -36,21 +36,21 @@ Light and dark mode share **one set of token names**; components only use the to
 
 | Token | Hex (light) | Hex (dark) | Where it shows up |
 |---|---|---|---|
-| `brand-primary` | `#4F46E5` | `#818CF8` | Header, "+" button, focus rings |
-| `brand-accent` | `#0369A1` | `#38BDF8` | Highlights, hover states, links |
-| `surface-page` | `#F8FAFC` | `#0B0F17` | Page background |
-| `surface-card` | `#FFFFFF` | `#161B26` | Card background |
-| `text-primary` | `#0F172A` | `#E2E8F0` | Body text |
-| `text-muted` | `#475569` | `#94A3B8` | Captions, dates, counts |
+| `brand-primary` | `#881337` (maroon) | `#F9A8D4` | Header, "+" button, focus rings |
+| `brand-accent` | `#BE185D` (pink) | `#F472B6` | Highlights, hover states, links, column tint |
+| `surface-page` | `#FDF8F9` | `#140B0F` | Page background |
+| `surface-card` | `#FFFFFF` | `#21141A` | Card background |
+| `text-primary` | `#1C1917` | `#F5F0F2` | Body text |
+| `text-muted` | `#57534E` | `#A8A29E` | Captions, dates, counts |
 
 ### Task type (M6 `tag-style`)
 
 | Token | Hex (light) | Hex (dark) | When used |
 |---|---|---|---|
 | `type-feature` | `#0F766E` | `#2DD4BF` | Cards tagged `feature` (teal stripe + Sparkles icon + "Feature" label) |
-| `type-bug` | `#BE185D` | `#F472B6` | Cards tagged `bug` (rose stripe + Bug icon + "Bug" label) |
+| `type-bug` | `#6D28D9` | `#C4B5FD` | Cards tagged `bug` (violet stripe + Bug icon + "Bug" label) |
 
-Bug is rose, not red, so it is never confused with the red "overdue" state.
+Bug is violet so it never blends with the pink brand colours or the red "overdue" state.
 
 ### Due-date states (M8 `due-tint`)
 
@@ -101,7 +101,7 @@ Tone: calm, direct, a little warm. Short sentences, no jargon, no exclamation ma
 
 ## 6. Logo / wordmark
 
-- **Product name:** Koki's Kanban
+- **Product name:** Amira's Kanban
 - **Wordmark style:** The name in Inter semibold, `brand-primary` colour, with a small Lucide `LayoutGrid` icon before it; the tagline "Where every prompt finds its way home." sits underneath in `text-muted`.
 
 ## 7. Out of scope (this hackathon)

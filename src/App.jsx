@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 /**
- * Koki's Kanban — Vibecoding Project Tracker.
+ * Amira's Kanban — Vibecoding Project Tracker.
  *
  * Build sequence in Phase 3:
  *   - M4  data-model    : four columns + task cards            ✅
@@ -175,7 +175,7 @@ function Column({ stage, tasks }) {
   return (
     <section
       aria-labelledby={headingId}
-      className="flex min-h-[16rem] flex-col rounded-lg bg-text-muted/5 p-3"
+      className="flex min-h-[16rem] flex-col rounded-lg bg-brand-accent/5 p-3"
     >
       <h2
         id={headingId}
@@ -221,7 +221,7 @@ export default function App() {
               <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
               <rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" />
             </svg>
-            Koki's Kanban
+            Amira's Kanban
           </h1>
           <p className="text-sm text-text-muted">Where every prompt finds its way home.</p>
         </div>
@@ -231,7 +231,7 @@ export default function App() {
       {/* TODO M11 anchors: render the Anchor Board (Presentation / Demo / Report / Documentation) above the board. */}
 
       {/* M4 data-model: the four-column Kanban board. */}
-      <main className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <main className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {STAGES.map((stage) => (
           <Column
             key={stage.id}
