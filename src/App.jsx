@@ -384,6 +384,101 @@ function ThemeToggle() {
   );
 }
 
+// ---------- M12 secret sauce #2: drag, drop & celebrate ----------
+// Confetti burst from a point on screen (skipped if the user prefers less motion).
+function celebrate(x, y) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const colours = ['#881337', '#BE185D', '#F9A8D4', '#0F766E', '#FBBF24'];
+  for (let i = 0; i < 40; i++) {
+    const bit = document.createElement('span');
+    const size = 6 + Math.random() * 6;
+    Object.assign(bit.style, {
+      position: 'fixed',
+      left: `${x}px`,
+      top: `${y}px`,
+      width: `${size}px`,
+      height: `${size * 0.6}px`,
+      background: colours[i % colours.length],
+      borderRadius: '2px',
+      pointerEvents: 'none',
+      zIndex: 60,
+    });
+    document.body.appendChild(bit);
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 60 + Math.random() * 120;
+    bit
+      .animate(
+        [
+          { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+          {
+            transform: `translate(${Math.cos(angle) * distance}px, ${
+              Math.sin(angle) * distance + 80
+            }px) rotate(${Math.random() * 720}deg)`,
+            opacity: 0,
+          },
+        ],
+        { duration: 900 + Math.random() * 400, easing: 'cubic-bezier(.2,.8,.4,1)' },
+      )
+      .finished.then(() => bit.remove());
+  }
+}
+
+// A soft two-note chime, made in the browser (no sound file needed).
+function playShipSound() {
+  try {
+    if (JSON.parse(localStorage.getItem('vibetracker.sound') ?? 'true') === false) return;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [660, 880].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + i * 0.12;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.32);
+    });
+  } catch {
+    /* sound is a nice-to-have; never break the app over it */
+  }
+}
+
+function SoundToggle() {
+  const [on, setOn] = useLocalStorage('vibetracker.sound', true);
+  return (
+    <button
+      type="button"
+      onClick={() => setOn(!on)}
+      aria-pressed={on}
+      aria-label={on ? 'Mute celebration sound' : 'Turn celebration sound on'}
+      title={on ? 'Sound on' : 'Sound off'}
+      className="rounded-md border border-text-muted/30 p-2 text-text-primary hover:bg-text-muted/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+    >
+      <svg
+        aria-hidden="true"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M11 5L6 9H2v6h4l5 4z" />
+        {on ? (
+          <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />
+        ) : (
+          <path d="M22 9l-6 6M16 9l6 6" />
+        )}
+      </svg>
+    </button>
+  );
+}
+
 function avatarStyle(name) {
   const i = TEAM.indexOf(name);
   return AVATAR_STYLE[i >= 0 ? i % AVATAR_STYLE.length : 0];
@@ -585,7 +680,9 @@ function TaskCard({ task, onOpen, onHandoff, highlighted, onCopy }) {
   const due = dueInfo(task);
   return (
     <li
-      className={`rounded-md border border-l-4 ${due.border} ${style.stripe} bg-surface-card transition-shadow hover:shadow-md ${
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData("text/plain", task.id); e.dataTransfer.effectAllowed = "move"; }}
+      className={`cursor-grab rounded-md border border-l-4 ${due.border} ${style.stripe} bg-surface-card transition-shadow hover:shadow-md ${
         highlighted ? 'ring-2 ring-brand-accent' : ''
       }`}
     >
@@ -684,12 +781,28 @@ function Toast({ message }) {
   );
 }
 
-function Column({ stage, tasks, onOpen, onHandoff, highlightId, onCopy }) {
+function Column({ stage, tasks, onOpen, onHandoff, highlightId, onCopy, onMove }) {
   const headingId = `col-${stage.id}`;
+  const [dragOver, setDragOver] = useState(false);
   return (
     <section
       aria-labelledby={headingId}
-      className="flex min-h-[16rem] flex-col rounded-lg bg-brand-accent/5 p-3"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const id = e.dataTransfer.getData('text/plain');
+        if (id) onMove(id, stage.id, e.clientX, e.clientY);
+      }}
+      className={`flex min-h-[16rem] flex-col rounded-lg p-3 transition-colors ${
+        dragOver
+          ? 'bg-brand-accent/15 ring-2 ring-dashed ring-brand-accent'
+          : 'bg-brand-accent/5'
+      }`}
     >
       <h2
         id={headingId}
@@ -703,12 +816,19 @@ function Column({ stage, tasks, onOpen, onHandoff, highlightId, onCopy }) {
 
       {tasks.length === 0 ? (
         <p className="flex flex-1 items-center justify-center rounded-md border-2 border-dashed border-text-muted/25 p-4 text-center text-xs text-text-muted">
-          Nothing here yet. Add a task to get moving.
+          {dragOver ? 'Drop it here.' : 'Nothing here yet. Add a task to get moving.'}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onOpen={onOpen} onHandoff={onHandoff} highlighted={task.id === highlightId} onCopy={onCopy} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onOpen={onOpen}
+              onHandoff={onHandoff}
+              highlighted={task.id === highlightId}
+              onCopy={onCopy}
+            />
           ))}
         </ul>
       )}
@@ -1015,6 +1135,20 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(''), 2500);
   };
 
+  // M12 secret sauce #2: move a task by drag & drop; celebrate when it ships.
+  const moveTask = (id, status, x, y) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task || task.status === status) return;
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+    if (status === 'done') {
+      celebrate(x, y);
+      playShipSound();
+      setToast(`Shipped "${task.title}". Nice work.`);
+      clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(''), 2500);
+    }
+  };
+
 const deleteTask = (id) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setEditing(null);
@@ -1052,6 +1186,7 @@ const deleteTask = (id) => {
         </div>
                 <div className="flex items-center gap-2">
           {/* M12 header buttons */}
+          <SoundToggle />
           <ThemeToggle />
           <button
             type="button"
@@ -1074,7 +1209,7 @@ const deleteTask = (id) => {
             key={stage.id}
             stage={stage}
             tasks={tasks.filter((t) => t.status === stage.id)}
-            onOpen={setEditing} onHandoff={handoffTask} onCopy={copyContext} highlightId={highlightId}
+            onOpen={setEditing} onHandoff={handoffTask} onCopy={copyContext} onMove={moveTask} highlightId={highlightId}
           />
         ))}
       </main>
