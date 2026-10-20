@@ -324,6 +324,65 @@ function AnchorBoard({ anchors, setAnchors }) {
   );
 }
 
+// ---------- M12 secret sauce #1: light / dark mode ----------
+// Follows the computer's setting until the user picks, then remembers it.
+function useTheme() {
+  const [theme, setTheme] = useLocalStorage('vibetracker.theme', null);
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e) => setSystemDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const isDark = theme ? theme === 'dark' : systemDark;
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+  }, [isDark]);
+
+  return [isDark, () => setTheme(isDark ? 'light' : 'dark')];
+}
+
+function ThemeToggle() {
+  const [isDark, toggle] = useTheme();
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={isDark}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Light mode' : 'Dark mode'}
+      className="rounded-md border border-text-muted/30 p-2 text-text-primary hover:bg-text-muted/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+    >
+      <svg
+        aria-hidden="true"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {isDark ? (
+          <>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </>
+        ) : (
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+        )}
+      </svg>
+    </button>
+  );
+}
 
 function avatarStyle(name) {
   const i = TEAM.indexOf(name);
@@ -991,13 +1050,17 @@ const deleteTask = (id) => {
             Where every prompt finds its way home.
           </p>
         </div>
-        <button
-          type="button"
-          className={btnPrimary}
-          onClick={() => setEditing(blankTask())}
-        >
-          + New task
-        </button>
+                <div className="flex items-center gap-2">
+          {/* M12 header buttons */}
+          <ThemeToggle />
+          <button
+            type="button"
+            className={btnPrimary}
+            onClick={() => setEditing(blankTask())}
+          >
+            + New task
+          </button>
+        </div>
       </header>
 
       {/* TODO M11 anchors: render the Anchor Board above the board. */}
