@@ -225,6 +225,106 @@ const COPY_ICON = (
 );
 
 
+
+// ---------- M11 anchors: the four final-project deliverables ----------
+const DEFAULT_ANCHORS = [
+  { id: 'presentation', label: 'Presentation', url: null },
+  { id: 'demo', label: 'Demo', url: null },
+  { id: 'report', label: 'Report', url: null },
+  { id: 'documentation', label: 'Documentation', url: null },
+];
+
+// "example.com" -> "https://example.com" so the Open link always works.
+function toHref(url) {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+function AnchorBoard({ anchors, setAnchors }) {
+  const linked = anchors.filter((a) => a.url).length;
+
+  const setUrl = (id, value) =>
+    setAnchors((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, url: value.trim() || null } : a)),
+    );
+
+  return (
+    <section aria-labelledby="anchors-title" className="mb-6">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2
+          id="anchors-title"
+          className="text-xs font-semibold uppercase tracking-wider text-text-muted"
+        >
+          Final deliverables
+        </h2>
+        <span className="font-mono text-xs text-text-muted">
+          {linked} of {anchors.length} linked
+        </span>
+      </div>
+
+      <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {anchors.map((a) => {
+          const inputId = `anchor-${a.id}`;
+          return (
+            <li
+              key={a.id}
+              className={`rounded-lg border bg-surface-card p-3 ${
+                a.url ? 'border-due-safe/40' : 'border-dashed border-text-muted/30'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <label
+                  htmlFor={inputId}
+                  className="flex items-center gap-2 text-sm font-medium text-text-primary"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      a.url
+                        ? 'bg-due-safe'
+                        : 'border-2 border-text-muted/50 bg-transparent'
+                    }`}
+                  />
+                  {a.label}
+                </label>
+                <span
+                  className={`font-mono text-[11px] ${
+                    a.url ? 'text-due-safe' : 'text-text-muted'
+                  }`}
+                >
+                  {a.url ? 'Linked' : 'Empty'}
+                </span>
+              </div>
+
+              <input
+                id={inputId}
+                type="url"
+                inputMode="url"
+                placeholder="Paste a link…"
+                defaultValue={a.url ?? ''}
+                onBlur={(e) => setUrl(a.id, e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                className="mt-2 w-full rounded-md border border-text-muted/30 bg-surface-page px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+              />
+
+              {a.url && (
+                <a
+                  href={toHref(a.url)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-xs font-medium text-brand-accent underline-offset-2 hover:underline"
+                >
+                  Open {a.label.toLowerCase()} ↗
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+
 function avatarStyle(name) {
   const i = TEAM.indexOf(name);
   return AVATAR_STYLE[i >= 0 ? i % AVATAR_STYLE.length : 0];
@@ -814,6 +914,9 @@ export default function App() {
   // M5 crud-modal: the task being edited (null = modal closed).
   const [editing, setEditing] = useState(null);
 
+  // M11 anchors: deliverable links, saved to localStorage.
+  const [anchors, setAnchors] = useLocalStorage('vibetracker.anchors', DEFAULT_ANCHORS);
+
   const saveTask = (task) => {
     if (task.id === null) {
       setTasks((prev) => [...prev, { ...task, id: newId() }]);
@@ -900,6 +1003,7 @@ const deleteTask = (id) => {
       {/* TODO M11 anchors: render the Anchor Board above the board. */}
 
       {/* M4 data-model: the four-column Kanban board. */}
+      <AnchorBoard anchors={anchors} setAnchors={setAnchors} />
       <DriverStrip tasks={tasks} />
       <main className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {STAGES.map((stage) => (
