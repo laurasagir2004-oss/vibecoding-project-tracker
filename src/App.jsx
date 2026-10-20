@@ -1123,7 +1123,7 @@ export default function App() {
     }, 2500);
   };
 
-    // M10 copy-context: copy the briefing and confirm with a toast.
+    // M10 copycontext: copy the briefing and confirm with a toast.
   const copyContext = async (task) => {
     const ok = await copyText(taskToMarkdown(task));
     setToast(
