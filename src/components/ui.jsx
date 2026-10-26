@@ -10,7 +10,7 @@ export const btnGhost = `inline-flex items-center justify-center gap-1.5 rounded
 export const btnDanger = `inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-due-overdue hover:bg-due-overdue/10 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent touch:min-h-[44px] ${focusRing}`;
 export const iconBtn = `inline-flex h-9 w-9 items-center justify-center rounded-md text-text-primary hover:bg-text-muted/10 touch:h-11 touch:w-11 ${focusRing}`;
 export const field =
-  'mt-1 w-full rounded-md border border-text-muted/40 bg-surface-card px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/30 touch:min-h-[44px]';
+  'mt-1 w-full rounded-md border border-text-muted/40 bg-surface-card px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/30 touch:min-h-[44px] touch:text-base';
 export const labelCls = 'block text-xs font-semibold uppercase tracking-wider text-text-muted';
 export const linkCls = `font-medium text-brand-accent underline underline-offset-2 hover:text-brand-primary ${focusRing}`;
 
@@ -86,7 +86,7 @@ export function LogoMark({ size = 28 }) {
 }
 
 // Logo top-left on every view; clicking it goes "home" to the board (Web Usability lecture).
-export function Logo({ onHome }) {
+export function Logo({ onHome, compact = false }) {
   return (
     <button
       type="button"
@@ -95,7 +95,7 @@ export function Logo({ onHome }) {
       aria-label="AnchorFlow, go to the board"
     >
       <LogoMark />
-      <span className="text-lg font-semibold tracking-tight text-text-primary">AnchorFlow</span>
+      {!compact && <span className="text-lg font-semibold tracking-tight text-text-primary">AnchorFlow</span>}
     </button>
   );
 }

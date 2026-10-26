@@ -248,9 +248,17 @@ export default function App() {
         Skip to main content
       </a>
 
-      <Sidebar view={view} setView={setView} counts={counts} onHome={goHome} toggles={toggles} />
+      <Sidebar
+        view={view}
+        setView={setView}
+        counts={counts}
+        onHome={goHome}
+        toggles={toggles}
+        collapsed={settings.sidebarCollapsed}
+        onToggle={() => setSettings((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }))}
+      />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col" inert={editing ? "" : undefined}>
         <MobileBar
           view={view}
           setView={setView}

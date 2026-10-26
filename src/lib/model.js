@@ -237,6 +237,7 @@ export const DEFAULT_SETTINGS = {
   sound: false, // off by default: no surprise noise in open-plan offices
   autoArchiveDays: 14, // 0 = never
   deliverablesOpen: false,
+  sidebarCollapsed: false,
   collapsed: { todo: false, 'in-progress': false, review: false, done: false },
 };
 
