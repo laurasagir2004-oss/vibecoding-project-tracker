@@ -6,6 +6,7 @@ import {
   DEFAULT_TEAM,
   blankTask,
   newId,
+  normaliseMember,
   normaliseTask,
   seedLibrary,
   seedTasks,
@@ -36,7 +37,7 @@ export default function App() {
     legacyKey: 'vibetracker.tasks',
     migrate: (list) => list.map(normaliseTask),
   });
-  const [team, setTeam] = useLocalStorage('anchorflow.team', DEFAULT_TEAM);
+  const [team, setTeam] = useLocalStorage('anchorflow.team', DEFAULT_TEAM, { migrate: (list) => list.map(normaliseMember) });
   const [anchors, setAnchors] = useLocalStorage('anchorflow.anchors', DEFAULT_ANCHORS, { legacyKey: 'vibetracker.anchors' });
   const [library, setLibrary] = useLocalStorage('anchorflow.library', seedLibrary);
   const [settings, setSettings] = useLocalStorage('anchorflow.settings', DEFAULT_SETTINGS, {
@@ -85,6 +86,14 @@ export default function App() {
     document.documentElement.classList.toggle('dark', isDark);
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
   }, [isDark]);
+
+  // ---------- accessibility preferences ----------
+  useEffect(() => {
+    const root = document.documentElement.dataset;
+    root.text = settings.textSize;
+    root.spacing = settings.lineSpacing;
+    root.motion = settings.motion;
+  }, [settings.textSize, settings.lineSpacing, settings.motion]);
 
   // ---------- auto-archive: done tasks older than N days leave the board ----------
   useEffect(() => {
@@ -203,6 +212,15 @@ export default function App() {
     setTeam((prev) => [...prev, m]);
     notify(`Added ${m.name} to the team.`);
   };
+  const updateMember = (before, after) => {
+    setTeam((prev) => prev.map((x) => (x.id === after.id ? after : x)));
+    // Tasks store the owner's name, so a rename follows through to their tasks and the filter.
+    if (before.name !== after.name) {
+      setTasks((prev) => prev.map((t) => (t.assignee === before.name ? { ...t, assignee: after.name } : t)));
+      if (filters.person === before.name) setFilters((f) => ({ ...f, person: after.name }));
+    }
+    notify(`Saved ${after.name}'s details.`);
+  };
   const removeMember = (m) => {
     setTeam((prev) => prev.filter((x) => x.id !== m.id));
     setTasks((prev) => prev.map((t) => (t.assignee === m.name ? { ...t, assignee: '' } : t)));
@@ -290,10 +308,10 @@ export default function App() {
             />
           )}
           {view === 'archive' && (
-            <ArchiveView tasks={archived} days={settings.autoArchiveDays} onRestore={restoreTask} onDelete={deleteTask} />
+            <ArchiveView tasks={archived} days={settings.autoArchiveDays} onRestore={restoreTask} onDelete={deleteTask} onCopy={copyContext} team={team} />
           )}
           {view === 'library' && <LibraryView library={library} setLibrary={setLibrary} onCopy={copyPlain} notify={notify} />}
-          {view === 'team' && <TeamView team={team} tasks={activeTasks} onAdd={addMember} onRemove={removeMember} />}
+          {view === 'team' && <TeamView team={team} tasks={activeTasks} onAdd={addMember} onUpdate={updateMember} onRemove={removeMember} />}
           {view === 'settings' && <SettingsView settings={settings} setSettings={setSettings} onReset={resetData} />}
         </main>
       </div>

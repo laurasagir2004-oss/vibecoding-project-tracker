@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { STAGES, dueState } from '../lib/model.js';
+import { STAGES, dueState, memberLabel } from '../lib/model.js';
 import {
   Avatar,
   DUE_BORDER,
@@ -191,6 +191,7 @@ function Toolbar({ team, tasks, filters, setFilters, shown, total }) {
             >
               <Avatar name={m.name} index={i} size="h-6 w-6" />
               <span>{m.name}</span>
+              {m.role && <span className={`hidden sm:inline ${on ? 'text-surface-card/80' : 'text-text-muted'}`}>· {m.role}</span>}
               <span className={`font-mono ${on ? 'text-surface-card/80' : 'text-text-muted'}`}>
                 {activeCount(m.name)} active
               </span>
@@ -268,20 +269,27 @@ function TaskCard({ task, team, onOpen, onHandoff, onCopy, onMove, onArchive, hi
           <label htmlFor={`handoff-${task.id}`} className="sr-only">
             Hand off {task.key} to
           </label>
-          <select
-            id={`handoff-${task.id}`}
-            value={task.assignee}
-            onChange={(e) => onHandoff(task.id, e.target.value)}
-            title="Hand off to…"
-            className={`min-w-0 cursor-pointer rounded border border-transparent bg-transparent py-1 pr-6 text-xs text-text-primary hover:border-text-muted/40 touch:min-h-[44px] ${focusRing}`}
-          >
-            <option value="">Unassigned</option>
-            {team.map((m) => (
-              <option key={m.id} value={m.name}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+          {/* The card shows just the name; the open list shows "Name · Role" so you can see who you are handing to. */}
+          <div className="relative flex min-w-0 items-center rounded border border-transparent hover:border-text-muted/40 focus-within:ring-2 focus-within:ring-brand-accent touch:min-h-[44px]">
+            <span aria-hidden="true" className="truncate py-1 pl-1 pr-5 text-xs text-text-primary">
+              {task.assignee || 'Unassigned'}
+            </span>
+            <Icon name="chevronDown" size={12} className="pointer-events-none absolute right-1 text-text-muted" />
+            <select
+              id={`handoff-${task.id}`}
+              value={task.assignee}
+              onChange={(e) => onHandoff(task.id, e.target.value)}
+              title="Hand off to…"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            >
+              <option value="">Unassigned</option>
+              {team.map((m) => (
+                <option key={m.id} value={m.name}>
+                  {memberLabel(m)}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <DueBadge task={task} />
       </div>
@@ -290,7 +298,7 @@ function TaskCard({ task, team, onOpen, onHandoff, onCopy, onMove, onArchive, hi
         <button
           type="button"
           onClick={() => onCopy(task)}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-bl-md py-2 font-medium text-text-primary hover:bg-text-muted/10 touch:min-h-[44px] ${focusRing}`}
+          className={`flex min-w-0 flex-1 basis-0 items-center justify-center gap-1.5 rounded-bl-md py-2 font-medium text-text-primary hover:bg-text-muted/10 touch:min-h-[44px] ${focusRing}`}
           aria-label={`Copy context for ${task.key}`}
         >
           <Icon name="copy" size={12} />
@@ -309,7 +317,7 @@ function TaskCard({ task, team, onOpen, onHandoff, onCopy, onMove, onArchive, hi
             const r = e.currentTarget.getBoundingClientRect();
             onMove(task.id, e.target.value, r.left + r.width / 2, r.top);
           }}
-          className={`flex-1 cursor-pointer bg-transparent py-2 pl-2 text-center text-xs font-medium text-text-primary hover:bg-text-muted/10 touch:min-h-[44px] ${focusRing}`}
+          className={`min-w-0 flex-1 basis-0 cursor-pointer bg-transparent py-2 pl-2 text-center text-xs font-medium text-text-primary hover:bg-text-muted/10 touch:min-h-[44px] ${focusRing}`}
         >
           {STAGES.map((s) => (
             <option key={s.id} value={s.id}>

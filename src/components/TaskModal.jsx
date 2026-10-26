@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { CONTEXT_TEMPLATE, CONTEXT_TOOLS, OUTCOMES, STAGES, estimateTokens, newId, timeAgo } from '../lib/model.js';
+import { CONTEXT_TEMPLATE, CONTEXT_TOOLS, OUTCOMES, STAGES, estimateTokens, memberLabel, newId, timeAgo } from '../lib/model.js';
 import { Icon, TypeBadge, btnDanger, btnGhost, btnPrimary, field, iconBtn, labelCls, useDialog } from './ui.jsx';
 
 function Section({ title, hint, children, id }) {
@@ -113,7 +113,7 @@ export function TaskModal({ task, team, onSave, onDelete, onClose, onCopy, onArc
               <select id="f-assignee" className={field} value={draft.assignee} onChange={update('assignee')}>
                 <option value="">Unassigned</option>
                 {team.map((m) => (
-                  <option key={m.id} value={m.name}>{m.name}</option>
+                  <option key={m.id} value={m.name}>{memberLabel(m)}</option>
                 ))}
               </select>
             </div>

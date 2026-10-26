@@ -12,7 +12,7 @@ export const STAGES = [
   { id: 'done', label: 'Done' },
 ];
 
-export const CONTEXT_TOOLS = ['Claude', 'ChatGPT', 'Cursor', 'Lovable', 'Replit', 'Other'];
+export const CONTEXT_TOOLS = ['ChatGPT', 'Claude', 'Gemini', 'GitHub Copilot', 'Cursor', 'Lovable', 'Replit', 'Other'];
 
 // Prompting techniques from the client's Intent Coding talk.
 export const TECHNIQUES = [
@@ -23,6 +23,7 @@ export const TECHNIQUES = [
   'Chain of thought',
   'Tree of thoughts',
   'Meta-prompting',
+  'System prompting',
 ];
 
 // added: outcome of the last prompt (hackathon brief: "prompt + AI tool + outcome").
@@ -219,11 +220,27 @@ export function taskToBriefing(task) {
 }
 
 // ---------- defaults & sample data ----------
-export const DEFAULT_TEAM = [
-  { id: 'm-amira', name: 'Amira Koki', email: 'amira@example.com', github: 'amira-koki' },
-  { id: 'm-jordan', name: 'Jordan Lee', email: 'jordan@example.com', github: 'jordanlee' },
-  { id: 'm-priya', name: 'Priya Shah', email: 'priya@example.com', github: 'priyashah' },
+// Team roles named by the client; they match stakeholders SH3–SH10 in the report.
+export const ROLES = [
+  'Junior developer',
+  'Senior developer',
+  'Software architect',
+  'Project manager',
+  'QA engineer',
+  'UX / front-end developer',
+  'Database developer',
+  'DevOps engineer',
 ];
+
+export const DEFAULT_TEAM = [
+  { id: 'm-amira', name: 'Amira Koki', role: 'Junior developer', email: 'amira@example.com', github: 'amira-koki' },
+  { id: 'm-jordan', name: 'Jordan Lee', role: 'Senior developer', email: 'jordan@example.com', github: 'jordanlee' },
+  { id: 'm-priya', name: 'Priya Shah', role: 'QA engineer', email: 'priya@example.com', github: 'priyashah' },
+];
+
+// Older saved teams have no role: fill it from the sample team where the id matches.
+export const normaliseMember = (m) => ({ ...m, role: m.role ?? DEFAULT_TEAM.find((d) => d.id === m.id)?.role ?? '' });
+export const memberLabel = (m) => (m.role ? `${m.name} · ${m.role}` : m.name);
 
 export const DEFAULT_ANCHORS = [
   { id: 'presentation', label: 'Presentation', url: null },
@@ -232,12 +249,18 @@ export const DEFAULT_ANCHORS = [
   { id: 'documentation', label: 'Documentation', url: null },
 ];
 
+export const A11Y_DEFAULTS = { textSize: 'default', lineSpacing: 'default', motion: 'system' };
+
 export const DEFAULT_SETTINGS = {
   theme: 'system', // 'system' | 'light' | 'dark'
   sound: false, // off by default: no surprise noise in open-plan offices
   autoArchiveDays: 14, // 0 = never
   deliverablesOpen: false,
   sidebarCollapsed: false,
+  // Accessibility preferences (WCAG 1.4.4 resize text, 1.4.12 text spacing, 2.3.3 animation from interactions)
+  textSize: 'default', // 'default' | 'large' | 'larger'
+  lineSpacing: 'default', // 'default' | 'wide'
+  motion: 'system', // 'system' (follow device) | 'reduce' | 'allow'
   collapsed: { todo: false, 'in-progress': false, review: false, done: false },
 };
 

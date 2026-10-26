@@ -1,8 +1,13 @@
 // Small browser effects. None of them carry information on their own:
 // every celebration also shows a visible toast (accessibility: deaf / reduced motion).
 
-export const prefersReducedMotion = () =>
-  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+// The Motion setting (Settings → Accessibility) can override the device preference.
+export const prefersReducedMotion = () => {
+  const choice = document.documentElement.dataset.motion;
+  if (choice === 'reduce') return true;
+  if (choice === 'allow') return false;
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+};
 
 // Confetti burst (variable reward). Skipped for users who prefer less motion.
 export function celebrate(x = window.innerWidth / 2, y = window.innerHeight / 3) {

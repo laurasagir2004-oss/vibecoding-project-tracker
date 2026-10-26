@@ -11,3 +11,25 @@ body,
 body {
   @apply bg-surface-page text-text-primary;
 }
+
+/* ---------- Accessibility preferences (Settings → Accessibility) ---------- */
+/* Text size: every size in the app is in rem, so changing the root size scales the whole UI (WCAG 1.4.4). */
+html[data-text='large'] { font-size: 112.5%; }
+html[data-text='larger'] { font-size: 125%; }
+
+/* Wider spacing, at the WCAG 1.4.12 text-spacing values (helps dyslexic readers). */
+html[data-spacing='wide'] body * {
+  line-height: 1.75 !important;
+  letter-spacing: 0.06em !important;
+  word-spacing: 0.16em !important;
+}
+
+/* Reduce motion: switch off transitions and animations everywhere (WCAG 2.3.3). */
+html[data-motion='reduce'] *,
+html[data-motion='reduce'] *::before,
+html[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

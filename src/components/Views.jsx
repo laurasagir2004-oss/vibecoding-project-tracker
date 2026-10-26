@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { CONTEXT_TOOLS, TECHNIQUES, formatDate, newId } from '../lib/model.js';
-import { Avatar, Icon, TypeBadge, btnDanger, btnGhost, btnPrimary, field, labelCls, linkCls, useDialog } from './ui.jsx';
+import { A11Y_DEFAULTS, CONTEXT_TOOLS, ROLES, TECHNIQUES, formatDate, memberLabel, newId } from '../lib/model.js';
+import { Avatar, Icon, OutcomeBadge, TypeBadge, btnDanger, btnGhost, btnPrimary, field, iconBtn, labelCls, linkCls, useDialog } from './ui.jsx';
 
 function ViewHeader({ title, children, action }) {
   return (
@@ -17,8 +17,83 @@ function ViewHeader({ title, children, action }) {
 const card = 'rounded-lg border border-text-muted/20 bg-surface-card';
 
 // ---------- Archive ----------
-export function ArchiveView({ tasks, days, onRestore, onDelete }) {
+// Read-only view of an archived task: look up an old prompt or outcome without putting it back on the board.
+function ArchivedTaskDialog({ task, team, onClose, onCopy, onRestore }) {
+  const ref = useRef(null);
+  useDialog(ref, onClose);
+  const owner = team.find((m) => m.name === task.assignee);
+  const done = task.checklist?.filter((c) => c.done).length ?? 0;
+  const Row = ({ label, children }) => (
+    <div>
+      <dt className={labelCls}>{label}</dt>
+      <dd className="mt-1 text-sm text-text-primary">{children}</dd>
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="archived-title" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-lg bg-surface-card p-5 shadow-xl sm:rounded-lg sm:p-6">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h2 id="archived-title" className="flex flex-wrap items-center gap-2 text-lg font-semibold text-text-primary">
+            <span className="font-mono text-sm font-normal text-text-muted">{task.key}</span>
+            {task.title}
+            <TypeBadge type={task.type} />
+          </h2>
+          <button type="button" className={iconBtn} aria-label="Close" onClick={onClose} data-autofocus>
+            <Icon name="x" size={18} />
+          </button>
+        </div>
+        <p className="mb-4 rounded-md bg-surface-page px-3 py-2 text-xs text-text-muted">
+          Archived {formatDate(task.archivedAt)}. Read-only: restore it to the board to make changes.
+        </p>
+        <dl className="space-y-4">
+          {task.description && <Row label="Description">{task.description}</Row>}
+          <Row label="Owner">{owner ? memberLabel(owner) : task.assignee || 'Unassigned'}</Row>
+          <Row label="Due date">{task.dueDate ? formatDate(task.dueDate) : 'None'}</Row>
+          {task.checklist?.length > 0 && (
+            <Row label={`Ready when (${done} of ${task.checklist.length} done)`}>
+              <ul className="space-y-1">
+                {task.checklist.map((c) => (
+                  <li key={c.id} className="flex items-center gap-2">
+                    <Icon name={c.done ? 'check' : 'x'} size={14} />
+                    <span className={c.done ? '' : 'text-text-muted'}>{c.text}</span>
+                    <span className="sr-only">{c.done ? '(done)' : '(not done)'}</span>
+                  </li>
+                ))}
+              </ul>
+            </Row>
+          )}
+          <Row label={`Context${task.contextTool ? ` · ${task.contextTool}` : ''}`}>
+            {task.context?.trim() ? (
+              <pre className="whitespace-pre-wrap rounded-md border border-text-muted/20 bg-surface-page p-3 font-mono text-xs leading-relaxed">{task.context}</pre>
+            ) : (
+              <span className="text-text-muted">No context saved.</span>
+            )}
+          </Row>
+          <Row label="Outcome">
+            <span className="flex flex-wrap items-center gap-2">
+              {task.outcome?.result ? <OutcomeBadge result={task.outcome.result} /> : <span className="text-text-muted">Not recorded</span>}
+              {task.outcome?.note && <span>{task.outcome.note}</span>}
+            </span>
+          </Row>
+        </dl>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button type="button" className={btnGhost} onClick={() => onCopy(task)}>
+            <Icon name="copy" size={14} />
+            Copy context
+          </button>
+          <button type="button" className={btnPrimary} onClick={() => { onRestore(task.id); onClose(); }}>
+            <Icon name="restore" size={14} />
+            Restore to board
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ArchiveView({ tasks, days, onRestore, onDelete, onCopy, team }) {
   const [confirm, setConfirm] = useState(null);
+  const [viewing, setViewing] = useState(null);
   return (
     <div>
       <ViewHeader title="Archive">
@@ -33,12 +108,23 @@ export function ArchiveView({ tasks, days, onRestore, onDelete }) {
           {tasks.map((t) => (
             <li key={t.id} className={`${card} flex flex-wrap items-center gap-3 p-3`}>
               <span className="font-mono text-xs text-text-muted">{t.key}</span>
-              <span className="min-w-[12rem] flex-1 text-sm font-medium text-text-primary">{t.title}</span>
+              <button
+                type="button"
+                onClick={() => setViewing(t)}
+                className={`min-w-[12rem] flex-1 rounded text-left text-sm font-medium text-text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent`}
+              >
+                {t.title}
+                <span className="sr-only"> (view details)</span>
+              </button>
               <TypeBadge type={t.type} />
               <span className="text-xs text-text-muted">
                 {t.assignee || 'Unassigned'} · archived {formatDate(t.archivedAt)}
               </span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={btnGhost} onClick={() => setViewing(t)} aria-label={`View details of ${t.key}`}>
+                  <Icon name="eye" size={14} />
+                  View
+                </button>
                 <button type="button" className={btnGhost} onClick={() => onRestore(t.id)} aria-label={`Restore ${t.key} to the board`}>
                   <Icon name="restore" size={14} />
                   Restore
@@ -60,6 +146,9 @@ export function ArchiveView({ tasks, days, onRestore, onDelete }) {
           ))}
         </ul>
       )}
+      {viewing && (
+        <ArchivedTaskDialog task={viewing} team={team} onClose={() => setViewing(null)} onCopy={onCopy} onRestore={onRestore} />
+      )}
     </div>
   );
 }
@@ -67,8 +156,11 @@ export function ArchiveView({ tasks, days, onRestore, onDelete }) {
 // ---------- Team ----------
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function TeamView({ team, tasks, onAdd, onRemove }) {
-  const [form, setForm] = useState({ name: '', email: '', github: '' });
+const EMPTY_MEMBER = { name: '', role: '', email: '', github: '' };
+
+export function TeamView({ team, tasks, onAdd, onUpdate, onRemove }) {
+  const [form, setForm] = useState(EMPTY_MEMBER);
+  const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
   const nameRef = useRef(null);
 
@@ -77,20 +169,40 @@ export function TeamView({ team, tasks, onAdd, onRemove }) {
     const err = {};
     const name = form.name.trim();
     if (!name) err.name = 'Enter a name.';
-    else if (team.some((m) => m.name.toLowerCase() === name.toLowerCase())) err.name = 'Someone with this name is already in the team.';
+    else if (team.some((m) => m.id !== editingId && m.name.toLowerCase() === name.toLowerCase())) err.name = 'Someone with this name is already in the team.';
+    if (!form.role) err.role = 'Choose a role.';
     if (!form.email.trim()) err.email = 'Enter an email address.';
     else if (!EMAIL_RE.test(form.email.trim())) err.email = 'Enter an email address like name@example.com.';
     setErrors(err);
     if (Object.keys(err).length) return;
-    onAdd({ id: newId(), name, email: form.email.trim(), github: form.github.trim().replace(/^@/, '') });
-    setForm({ name: '', email: '', github: '' });
+    const details = { name, role: form.role, email: form.email.trim(), github: form.github.trim().replace(/^@/, '') };
+    if (editingId) {
+      const before = team.find((m) => m.id === editingId);
+      onUpdate(before, { ...before, ...details });
+      setEditingId(null);
+    } else {
+      onAdd({ id: newId(), ...details });
+    }
+    setForm(EMPTY_MEMBER);
     nameRef.current?.focus();
+  };
+
+  const startEdit = (m) => {
+    setEditingId(m.id);
+    setForm({ name: m.name, role: m.role || '', email: m.email, github: m.github || '' });
+    setErrors({});
+    nameRef.current?.focus();
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(EMPTY_MEMBER);
+    setErrors({});
   };
 
   return (
     <div>
       <ViewHeader title="Team">
-        Everyone who can own a task. Name and email let teammates contact a task's owner; the GitHub handle links to their work.
+        Everyone who can own a task. Their role shows who you are handing work to; name and email let teammates contact a task's owner; the GitHub handle links to their work.
       </ViewHeader>
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <ul className="space-y-2" aria-label="Team members">
@@ -101,6 +213,7 @@ export function TeamView({ team, tasks, onAdd, onRemove }) {
                 <Avatar name={m.name} index={i} size="h-9 w-9" />
                 <div className="min-w-[10rem] flex-1">
                   <p className="text-sm font-medium text-text-primary">{m.name}</p>
+                  {m.role && <p className="text-xs text-text-muted">{m.role}</p>}
                   <p className="flex flex-wrap gap-x-3 text-xs">
                     <a href={`mailto:${m.email}`} className={linkCls}>{m.email}</a>
                     {m.github && (
@@ -112,6 +225,10 @@ export function TeamView({ team, tasks, onAdd, onRemove }) {
                   </p>
                 </div>
                 <span className="font-mono text-xs text-text-muted">{active} active</span>
+                <button type="button" className={btnGhost} onClick={() => startEdit(m)} aria-label={`Edit ${m.name}'s details`}>
+                  <Icon name="edit" size={14} />
+                  Edit
+                </button>
                 <button
                   type="button"
                   className={btnDanger}
@@ -132,12 +249,40 @@ export function TeamView({ team, tasks, onAdd, onRemove }) {
         </ul>
 
         <form onSubmit={submit} noValidate className={`${card} h-fit space-y-3 p-4`} aria-labelledby="add-member-title">
-          <h2 id="add-member-title" className="text-base font-semibold text-text-primary">Add a team member</h2>
+          <h2 id="add-member-title" className="text-base font-semibold text-text-primary">
+            {editingId ? 'Edit team member' : 'Add a team member'}
+          </h2>
           {[
             ['name', 'Name', 'text', 'e.g. Sam Patel', true, 'name'],
+            ['role'],
             ['email', 'Email', 'email', 'sam@example.com', true, 'email'],
             ['github', 'GitHub handle (optional)', 'text', 'sampatel', false, 'off'],
-          ].map(([key, label, type, ph, req, auto]) => (
+          ].map(([key, label, type, ph, req, auto]) => (key === 'role' ? (
+            <div key="role">
+              <label htmlFor="m-role" className={labelCls}>
+                Role<span className="sr-only"> (required)</span>
+              </label>
+              <select
+                id="m-role"
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                aria-invalid={!!errors.role}
+                aria-describedby={errors.role ? 'm-role-err' : undefined}
+                className={`${field} ${errors.role ? 'border-due-overdue' : ''}`}
+              >
+                <option value="">Choose a role…</option>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              {errors.role && (
+                <p id="m-role-err" className="mt-1 flex items-center gap-1 text-xs text-due-overdue">
+                  <Icon name="overdue" size={12} />
+                  {errors.role}
+                </p>
+              )}
+            </div>
+          ) : (
             <div key={key}>
               <label htmlFor={`m-${key}`} className={labelCls}>
                 {label}
@@ -162,11 +307,22 @@ export function TeamView({ team, tasks, onAdd, onRemove }) {
                 </p>
               )}
             </div>
-          ))}
-          <button type="submit" className={`${btnPrimary} w-full`}>
-            <Icon name="plus" size={16} />
-            Add member
-          </button>
+          )))}
+          {editingId ? (
+            <div className="flex gap-2">
+              <button type="button" className={`${btnGhost} flex-1`} onClick={cancelEdit}>
+                Cancel
+              </button>
+              <button type="submit" className={`${btnPrimary} flex-1`}>
+                Save changes
+              </button>
+            </div>
+          ) : (
+            <button type="submit" className={`${btnPrimary} w-full`}>
+              <Icon name="plus" size={16} />
+              Add member
+            </button>
+          )}
         </form>
       </div>
     </div>
@@ -298,9 +454,33 @@ export function LibraryView({ library, setLibrary, onCopy, notify }) {
 }
 
 // ---------- Settings ----------
+// A row of radio "pills" (same pattern as the theme choice).
+function Choice({ name, legend, hint, options, value, onChange }) {
+  return (
+    <fieldset className="mt-3 first:mt-1">
+      <legend className="text-sm font-medium text-text-primary">{legend}</legend>
+      {hint && <p className="text-xs text-text-muted">{hint}</p>}
+      <div className="mt-1 flex flex-wrap gap-2">
+        {options.map(([id, label]) => (
+          <label
+            key={id}
+            className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm touch:min-h-[44px] focus-within:ring-2 focus-within:ring-brand-accent ${
+              value === id ? 'border-brand-primary bg-brand-primary text-surface-card' : 'border-text-muted/30 text-text-primary'
+            }`}
+          >
+            <input type="radio" name={name} className="sr-only" checked={value === id} onChange={() => onChange(id)} />
+            {label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export function SettingsView({ settings, setSettings, onReset }) {
   const [confirm, setConfirm] = useState(false);
   const set = (patch) => setSettings((s) => ({ ...s, ...patch }));
+  const a11yChanged = Object.keys(A11Y_DEFAULTS).some((k) => settings[k] !== A11Y_DEFAULTS[k]);
   return (
     <div>
       <ViewHeader title="Settings">Make AnchorFlow work the way you like. Changes save automatically.</ViewHeader>
@@ -322,12 +502,43 @@ export function SettingsView({ settings, setSettings, onReset }) {
         </fieldset>
 
         <fieldset className={`${card} p-4`}>
+          <legend className="px-1 text-sm font-semibold text-text-primary">Accessibility</legend>
+          <Choice
+            name="textSize"
+            legend="Text size"
+            options={[['default', 'Default'], ['large', 'Large'], ['larger', 'Larger']]}
+            value={settings.textSize}
+            onChange={(id) => set({ textSize: id })}
+          />
+          <Choice
+            name="lineSpacing"
+            legend="Text spacing"
+            hint="Wider spacing between lines, letters and words can make text easier to read."
+            options={[['default', 'Default'], ['wide', 'Wider']]}
+            value={settings.lineSpacing}
+            onChange={(id) => set({ lineSpacing: id })}
+          />
+          <Choice
+            name="motion"
+            legend="Motion and confetti"
+            hint="Match my device follows your device's reduced-motion setting."
+            options={[['system', 'Match my device'], ['reduce', 'Reduce motion'], ['allow', 'Always show']]}
+            value={settings.motion}
+            onChange={(id) => set({ motion: id })}
+          />
+          <button type="button" className={`${btnGhost} mt-4`} onClick={() => set(A11Y_DEFAULTS)} disabled={!a11yChanged}>
+            <Icon name="restore" size={14} />
+            Reset accessibility settings
+          </button>
+        </fieldset>
+
+        <fieldset className={`${card} p-4`}>
           <legend className="px-1 text-sm font-semibold text-text-primary">Celebration</legend>
           <label className="flex items-center gap-3 text-sm text-text-primary touch:min-h-[44px]">
             <input type="checkbox" checked={settings.sound} onChange={(e) => set({ sound: e.target.checked })} className="h-4 w-4 accent-brand-primary touch:h-6 touch:w-6" />
             Play a short sound when a task is done
           </label>
-          <p className="mt-1 text-xs text-text-muted">Off by default. Confetti is skipped automatically if your device asks for reduced motion.</p>
+          <p className="mt-1 text-xs text-text-muted">Sound is off by default. Confetti follows the Motion setting above.</p>
         </fieldset>
 
         <fieldset className={`${card} p-4`}>
