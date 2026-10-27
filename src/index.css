@@ -33,3 +33,12 @@ html[data-motion='reduce'] *::after {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* Native dropdown lists: some browsers (e.g. Chrome on Windows) draw the open list with their own
+   colours, so options on a transparent select could end up dark-on-dark. Give every option the
+   theme's card and text colours so the list is readable in light and dark mode. */
+select option,
+select optgroup {
+  background-color: rgb(var(--surface-card));
+  color: rgb(var(--text-primary));
+}
