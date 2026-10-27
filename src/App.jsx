@@ -19,6 +19,7 @@ import { MobileBar, QuickToggles, Sidebar, VIEWS } from './components/Shell.jsx'
 import { BoardView, EMPTY_FILTERS } from './components/Board.jsx';
 import { TaskModal } from './components/TaskModal.jsx';
 import { ArchiveView, LibraryView, SettingsView, TeamView } from './components/Views.jsx';
+import { LoginView } from './components/Login.jsx';
 
 /**
  * AnchorFlow — a Kanban tracker for AI-assisted ("vibe-coded") software projects.
@@ -44,6 +45,13 @@ export default function App() {
     migrate: (s) => ({ ...DEFAULT_SETTINGS, ...s, collapsed: { ...DEFAULT_SETTINGS.collapsed, ...(s.collapsed || {}) } }),
   });
 
+  // Signed-in team member (front-end only; no passwords are stored or checked).
+  // First visit opens already signed in as the demo user, so assessors never have to log in;
+  // the sign-in screen appears only after "Sign out" (to switch user).
+  const [sessionId, setSessionId] = useLocalStorage('anchorflow.session', DEFAULT_TEAM[0].id);
+  const userIndex = team.findIndex((m) => m.id === sessionId);
+  const currentUser = userIndex >= 0 ? { ...team[userIndex], index: userIndex } : null;
+
   const [view, setViewState] = useState(viewFromHash);
   const [menuOpen, setMenuOpen] = useState(false);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -65,9 +73,9 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   useEffect(() => {
-    const label = VIEWS.find((v) => v.id === view)?.label ?? 'Board';
+    const label = sessionId ? VIEWS.find((v) => v.id === view)?.label ?? 'Board' : 'Sign in';
     document.title = `${label} · AnchorFlow`;
-  }, [view]);
+  }, [view, sessionId]);
   const goHome = () => {
     setFilters(EMPTY_FILTERS);
     setView('board');
@@ -134,7 +142,7 @@ export default function App() {
   const activeTasks = tasks.filter((t) => !t.archivedAt);
   const archived = tasks.filter((t) => t.archivedAt).sort((a, b) => (b.archivedAt > a.archivedAt ? 1 : -1));
 
-  const openNew = (status = 'todo') => setEditing(blankTask(tasks, team[0]?.name ?? '', status));
+  const openNew = (status = 'todo') => setEditing(blankTask(tasks, currentUser?.name ?? team[0]?.name ?? '', status));
 
   const saveTask = (draft) => {
     const before = tasks.find((t) => t.id === draft.id);
@@ -228,6 +236,17 @@ export default function App() {
     notify(`Removed ${m.name} from the team.`);
   };
 
+  const signIn = (member) => {
+    setSessionId(member.id);
+    notify(`Signed in as ${member.name}.`);
+  };
+  const signOut = () => {
+    setSessionId(null);
+    setEditing(null);
+    setMenuOpen(false);
+    notify('Signed out.');
+  };
+
   const resetData = () => {
     setTasks(seedTasks());
     setTeam(DEFAULT_TEAM);
@@ -235,6 +254,8 @@ export default function App() {
     setLibrary(seedLibrary());
     setSettings(DEFAULT_SETTINGS);
     setFilters(EMPTY_FILTERS);
+    // Stay signed in only if that person is still in the sample team.
+    if (!DEFAULT_TEAM.some((m) => m.id === sessionId)) setSessionId(null);
     notify('Sample data restored.');
   };
 
@@ -252,6 +273,15 @@ export default function App() {
     library: library.length,
     team: team.length,
   };
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-surface-page font-sans text-text-primary">
+        <LoginView team={team} onSignIn={signIn} />
+        <Toast message={toast} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-surface-page font-sans text-text-primary">
@@ -274,6 +304,8 @@ export default function App() {
         toggles={toggles}
         collapsed={settings.sidebarCollapsed}
         onToggle={() => setSettings((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }))}
+        user={currentUser}
+        onSignOut={signOut}
       />
 
       <div className="flex min-w-0 flex-1 flex-col" inert={editing ? "" : undefined}>
@@ -285,6 +317,8 @@ export default function App() {
           menuOpen={menuOpen}
           setMenuOpen={setMenuOpen}
           onNewTask={() => openNew('todo')}
+          user={currentUser}
+          onSignOut={signOut}
           toggles={toggles}
         />
         <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 p-4 outline-none sm:p-6">
@@ -311,7 +345,7 @@ export default function App() {
             <ArchiveView tasks={archived} days={settings.autoArchiveDays} onRestore={restoreTask} onDelete={deleteTask} onCopy={copyContext} team={team} />
           )}
           {view === 'library' && <LibraryView library={library} setLibrary={setLibrary} onCopy={copyPlain} notify={notify} />}
-          {view === 'team' && <TeamView team={team} tasks={activeTasks} onAdd={addMember} onUpdate={updateMember} onRemove={removeMember} />}
+          {view === 'team' && <TeamView team={team} tasks={activeTasks} currentId={sessionId} onAdd={addMember} onUpdate={updateMember} onRemove={removeMember} />}
           {view === 'settings' && <SettingsView settings={settings} setSettings={setSettings} onReset={resetData} />}
         </main>
       </div>

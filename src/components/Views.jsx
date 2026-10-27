@@ -158,7 +158,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const EMPTY_MEMBER = { name: '', role: '', email: '', github: '' };
 
-export function TeamView({ team, tasks, onAdd, onUpdate, onRemove }) {
+export function TeamView({ team, tasks, currentId, onAdd, onUpdate, onRemove }) {
   const [form, setForm] = useState(EMPTY_MEMBER);
   const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
@@ -233,15 +233,21 @@ export function TeamView({ team, tasks, onAdd, onUpdate, onRemove }) {
                   type="button"
                   className={btnDanger}
                   onClick={() => onRemove(m)}
-                  disabled={active > 0 || team.length === 1}
-                  aria-describedby={active > 0 ? `why-${m.id}` : undefined}
+                  disabled={active > 0 || team.length === 1 || m.id === currentId}
+                  aria-describedby={active > 0 || m.id === currentId ? `why-${m.id}` : undefined}
                 >
                   Remove
                 </button>
-                {active > 0 && (
+                {m.id === currentId ? (
                   <span id={`why-${m.id}`} className="w-full text-xs text-text-muted">
-                    Hand off {m.name.split(' ')[0]}'s {active} active task{active === 1 ? '' : 's'} before removing them.
+                    You are signed in as {m.name.split(' ')[0]}, so you can't remove yourself.
                   </span>
+                ) : (
+                  active > 0 && (
+                    <span id={`why-${m.id}`} className="w-full text-xs text-text-muted">
+                      Hand off {m.name.split(' ')[0]}'s {active} active task{active === 1 ? '' : 's'} before removing them.
+                    </span>
+                  )
                 )}
               </li>
             );

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Icon, Logo, focusRing, iconBtn, useDialog } from './ui.jsx';
+import { Avatar, Icon, Logo, focusRing, iconBtn, useDialog } from './ui.jsx';
 
 export const VIEWS = [
   { id: 'board', label: 'Board', icon: 'board' },
@@ -74,9 +74,41 @@ export function QuickToggles({ isDark, toggleTheme, sound, toggleSound }) {
   );
 }
 
+// Who is signed in, with a way to sign out (switch user). Compact = icon rail.
+function UserBlock({ user, onSignOut, compact = false }) {
+  if (!user) return null;
+  const signOut = (
+    <button type="button" onClick={onSignOut} className={iconBtn} aria-label={`Sign out ${user.name}`} title="Sign out">
+      <Icon name="logout" size={18} />
+    </button>
+  );
+  if (compact) {
+    return (
+      <div className="mb-3 flex flex-col items-center gap-2 border-t border-text-muted/20 pt-3" title={`${user.name} · ${user.role}`}>
+        <Avatar name={user.name} index={user.index} size="h-8 w-8" />
+        <span className="sr-only">Signed in as {user.name}</span>
+        {signOut}
+      </div>
+    );
+  }
+  return (
+    <div className="mb-3 flex items-center gap-3 border-t border-text-muted/20 px-2 pt-3">
+      <Avatar name={user.name} index={user.index} size="h-8 w-8" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-text-primary">
+          <span className="sr-only">Signed in as </span>
+          {user.name}
+        </p>
+        {user.role && <p className="truncate text-xs text-text-muted">{user.role}</p>}
+      </div>
+      {signOut}
+    </div>
+  );
+}
+
 // Desktop: a sidebar that can collapse to an icon-only rail, so the menu never disappears
 // (the menu stays visible alongside the content) but the board gets more room. The choice is remembered.
-export function Sidebar({ view, setView, counts, onHome, toggles, collapsed, onToggle }) {
+export function Sidebar({ view, setView, counts, onHome, toggles, collapsed, onToggle, user, onSignOut }) {
   const toggle = (
     <button
       type="button"
@@ -113,6 +145,7 @@ export function Sidebar({ view, setView, counts, onHome, toggles, collapsed, onT
       <nav id="sidebar-nav" aria-label="Main" className="mt-6 flex-1">
         <NavList view={view} setView={setView} counts={counts} compact={collapsed} />
       </nav>
+      <UserBlock user={user} onSignOut={onSignOut} compact={collapsed} />
       <div
         className={`border-t border-text-muted/20 pt-3 ${
           collapsed ? 'flex justify-center [&>div]:flex-col' : 'flex items-center justify-between px-2'
@@ -126,7 +159,7 @@ export function Sidebar({ view, setView, counts, onHome, toggles, collapsed, onT
 }
 
 // Phones: a slim top bar plus a slide-in menu (less is more on small screens).
-export function MobileBar({ view, setView, counts, onHome, menuOpen, setMenuOpen, onNewTask, toggles }) {
+export function MobileBar({ view, setView, counts, onHome, menuOpen, setMenuOpen, onNewTask, toggles, user, onSignOut }) {
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-text-muted/20 bg-surface-card px-3 py-2 md:hidden">
@@ -149,13 +182,13 @@ export function MobileBar({ view, setView, counts, onHome, menuOpen, setMenuOpen
         </button>
       </header>
       {menuOpen && (
-        <MobileMenu view={view} setView={setView} counts={counts} onClose={() => setMenuOpen(false)} toggles={toggles} />
+        <MobileMenu view={view} setView={setView} counts={counts} onClose={() => setMenuOpen(false)} toggles={toggles} user={user} onSignOut={onSignOut} />
       )}
     </>
   );
 }
 
-function MobileMenu({ view, setView, counts, onClose, toggles }) {
+function MobileMenu({ view, setView, counts, onClose, toggles, user, onSignOut }) {
   const ref = useRef(null);
   useDialog(ref, onClose);
   return (
@@ -177,6 +210,13 @@ function MobileMenu({ view, setView, counts, onClose, toggles }) {
         <nav aria-label="Main" className="flex-1">
           <NavList view={view} setView={setView} counts={counts} onNavigate={onClose} />
         </nav>
+        <UserBlock
+          user={user}
+          onSignOut={() => {
+            onClose();
+            onSignOut();
+          }}
+        />
         <div className="flex items-center justify-between border-t border-text-muted/20 pt-3">
           <span className="text-xs text-text-muted">Quick settings</span>
           {toggles}
