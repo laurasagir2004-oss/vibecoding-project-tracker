@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { CONTEXT_TEMPLATE, CONTEXT_TOOLS, OUTCOMES, STAGES, estimateTokens, memberLabel, newId, timeAgo } from '../lib/model.js';
+import { CONTEXT_TEMPLATE, CONTEXT_TOOLS, OUTCOMES, STAGES, memberLabel, newId, timeAgo } from '../lib/model.js';
 import { Icon, TypeBadge, btnDanger, btnGhost, btnPrimary, field, iconBtn, labelCls, useDialog } from './ui.jsx';
 
 function Section({ title, hint, children, id }) {
@@ -43,7 +43,6 @@ export function TaskModal({ task, team, onSave, onDelete, onClose, onCopy, onArc
     onSave({ ...draft, title: draft.title.trim(), description: draft.description.trim() });
   };
 
-  const tokens = estimateTokens(draft.context || '');
 
   return (
     <div
@@ -177,7 +176,7 @@ export function TaskModal({ task, team, onSave, onDelete, onClose, onCopy, onArc
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <label htmlFor="f-context" className={labelCls}>Briefing</label>
               <span className="text-xs text-text-muted" aria-live="polite">
-                {draft.contextUpdatedAt ? `Last updated ${timeAgo(draft.contextUpdatedAt)}` : 'Not updated yet'} · ≈ {tokens} tokens
+                {draft.contextUpdatedAt ? `Last updated ${timeAgo(draft.contextUpdatedAt)}` : 'Not updated yet'}
               </span>
             </div>
             <textarea
